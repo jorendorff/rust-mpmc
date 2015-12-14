@@ -19,6 +19,18 @@ impl<T> QueueData<T> {
 
 /// A multi-producer, multi-consumer queue, for use in dispatching tasks
 /// to/from multiple threads.
+///
+/// Each `Queue` has a fixed capacity, chosen at creation time. If a queue is
+/// full, `queue.put(value)` blocks until space is available.  Unix pipes are
+/// like this. With this design, a simple "pushback" mechanism is built in.
+///
+/// Suppose one thread in a pipeline is a bottleneck, and it needs more CPU
+/// time to keep up with upstream and downstream threads. If you use lock-free
+/// queues to connect the threads in this pipeline, data will pile up in the queue,
+/// and downstream consumers have no efficient way to wait for the next item.
+/// With `Queue`, upstream producers simply go to sleep in `put()` and downstream
+/// producers go to sleep in `take()`, and a thread is awakened when it can do
+/// useful work.
 #[derive(Clone)]
 pub struct Queue<T> {
     data: Arc<QueueData<T>>
@@ -30,6 +42,7 @@ impl<T> Queue<T> {
     /// The new `Queue`'s capacity is fixed.  `Queue`s do not grow, because we
     /// want `put()` and `take()` to be infallible.
     pub fn with_capacity(count: usize) -> Queue<T> {
+        assert!(count > 0);
         Queue {
             data: Arc::new(QueueData::with_capacity(count))
         }
